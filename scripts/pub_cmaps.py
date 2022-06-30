@@ -27,6 +27,7 @@ def main():
     rospy.init_node('cmap_pub')
     pub = rospy.Publisher(cmap_topic, OccupancyGrid, queue_size=1, latch=True)
     pub.publish(cmap)
+    rospy.loginfo(f"Publishing the costmap on {cmap_topic}")
     rospy.spin()
 
 

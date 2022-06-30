@@ -9,9 +9,7 @@ from nav_msgs.msg import OccupancyGrid
 
 
 def callback(msg: OccupancyGrid):
-    print(msg.header)
-    print(type(msg.data))
-
+    rospy.loginfo("Received a cost map")
     map_info = msg.info
 
     img = msg.data.reshape(map_info.height, map_info.width, 1).astype(np.uint8)

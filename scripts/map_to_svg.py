@@ -29,7 +29,7 @@ def callback(msg: OccupancyGrid):
 
     with open(svg_filename, 'w') as f:
         f.write(
-            f"<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%' viewbox='0 0 {img.shape[0] * 4} {img.shape[1] * 4}' fill='#044B94' fill-opacity='0.4'>")
+            f"<svg xmlns='http://www.w3.org/2000/svg' width='{int(img.shape[0] * 2)}' height='{int(img.shape[1] * 2)}' viewbox='0 0 {img.shape[0]  // 2} {img.shape[1] // 2}' fill='#044B94' fill-opacity='0.4'>")
         # f"<svg xmlns='http://www.w3.org/2000/svg' width='{int(img.shape[0] * scale)}' height='{int(img.shape[1] * scale)}' viewbox='0 0 {img.shape[0]} {img.shape[1]}' fill='#044B94' fill-opacity='0.4'>")
         for contour in contours:
             f.write(f"<path style='fill:none;stroke:#AAAAAA;stroke-width:2px;stroke-opacity:1' ")

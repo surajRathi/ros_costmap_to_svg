@@ -19,7 +19,9 @@ class CommonData:
     pub: rospy.Publisher
     thresh: int = 80
     stroke_color: str = '#00FFFF66'
-    fill_color: str = '#FFFF0066'
+    # https://stackoverflow.com/a/61099329/1515394
+    fill_color: str = 'rgb(255, 0, 0)'  # '#00FFFF66'.replace('#', '%23')
+    fill_opacity: str = '0.4'
     img: Optional[np.ndarray] = None
 
     def update(self):
@@ -41,15 +43,18 @@ class CommonData:
             f.write(
                 f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
                 "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+            f.write(
+                f"<path style='stroke:{self.stroke_color};stroke-width:2px;stroke-opacity:1' "
+                f"stroke-linecap='round' stroke-linejoin='round' "
+                f"fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' d='")
             for contour in contours:
-                f.write(
-                    f"<path style='stroke:{self.stroke_color};stroke-width:2px;stroke-opacity:1' stroke-linecap='round' stroke-linejoin='round'")
-                f.write(f" d='M {contour[0][0][0]} {contour[0][0][1]}")
+
+                f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
                 for (x, y), in contour[1:]:
                     f.write(f"L {x} {y} ")
-                f.write(f"L {contour[0][0][0]} {contour[0][0][1]} ")
+                f.write(f"Z ")
 
-                f.write("' />")
+            f.write("' />")
             f.write(f"</svg>")
 
             f.seek(0)

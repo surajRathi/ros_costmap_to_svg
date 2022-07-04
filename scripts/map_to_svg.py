@@ -17,7 +17,7 @@ svg_filename = "out.svg"
 @dataclasses.dataclass
 class CommonData:
     pub: rospy.Publisher
-    thresh: int = 60
+    thresh: int = 20
     erosion_iter: int = 2
     # https://stackoverflow.com/a/61099329/1515394
     fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
@@ -33,8 +33,8 @@ class CommonData:
 
         thresh = 80
         img = (self.img >= thresh).astype(np.uint8)
-        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
         img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
+        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
         contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
 
         rospy.logdebug(f"Got {len(contours)} contours")
@@ -82,14 +82,23 @@ def callback_updates(msg: numpy_msg(OccupancyGridUpdate), c: CommonData):
 def main():
     rospy.init_node("map_to_svg", anonymous=True)
 
-    topic: str = rospy.get_param("~topic", default="/move_base/global_costmap/costmap")
-    pub_topic: str = rospy.get_param("~pub_topic", default="/move_base/global_costmap/costmap_svg")
+    g_topic: str = '/move_base/global_costmap/costmap'
 
-    c = CommonData(pub=rospy.Publisher(pub_topic, String, queue_size=1, latch=True))
-    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=c)
+    g_data = CommonData(pub=rospy.Publisher(g_topic + '_svg', String, queue_size=1, latch=True))
+    g_data.fill_color = f"rgb(0, 0, {int(255 * 0.8)})"
+    g_sub = rospy.Subscriber(g_topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=g_data)
+    g_sub_updates = rospy.Subscriber(g_topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
+                                     callback=callback_updates,
+                                     callback_args=g_data)
+
+    topic: str = '/move_base/local_costmap/costmap'
+
+    data = CommonData(pub=rospy.Publisher(topic + '_svg', String, queue_size=1, latch=True))
+    data.fill_color = f"rgb({int(255 * 0.8)}, 0, 0)"
+    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=data)
     sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
                                    callback=callback_updates,
-                                   callback_args=c)
+                                   callback_args=data)
     print("created the sub")
     rospy.spin()
 

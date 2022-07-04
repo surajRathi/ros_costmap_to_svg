@@ -30,6 +30,7 @@ class CommonData:
         img = (self.img >= thresh).astype(np.uint8)
         img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
         img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
+        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
         contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
 
         rospy.logdebug(f"Got {len(contours)} contours")

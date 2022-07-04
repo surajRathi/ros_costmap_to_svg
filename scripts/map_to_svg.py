@@ -11,8 +11,6 @@ from map_msgs.msg import OccupancyGridUpdate
 from rospy.numpy_msg import numpy_msg
 from std_msgs.msg import String
 
-svg_filename = "out.svg"
-
 
 @dataclasses.dataclass
 class CommonData:
@@ -27,9 +25,6 @@ class CommonData:
     def update(self):
         if self.img is None:
             return
-
-        # cv2.imshow('map', self.img)
-        # cv2.waitKey(0)
 
         thresh = 80
         img = (self.img >= thresh).astype(np.uint8)

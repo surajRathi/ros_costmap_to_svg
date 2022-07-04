@@ -1,47 +1,79 @@
 #! /usr/bin/python3
+import dataclasses
 import io
+from typing import Optional
 
 import cv2
 import numpy as np
 import rospy
 from nav_msgs.msg import OccupancyGrid
+from map_msgs.msg import OccupancyGridUpdate
 from rospy.numpy_msg import numpy_msg
 from std_msgs.msg import String
 
 svg_filename = "out.svg"
 
 
-def callback(msg: OccupancyGrid, pub: rospy.Publisher):
-    rospy.loginfo("Received a cost map")
-    map_info = msg.info
+@dataclasses.dataclass
+class CommonData:
+    pub: rospy.Publisher
+    thresh: int = 80
+    stroke_color: str = '#00FFFF66'
+    fill_color: str = '#FFFF0066'
+    img: Optional[np.ndarray] = None
 
-    img = msg.data.reshape(map_info.height, map_info.width).astype(np.uint8)
+    def update(self):
+        if self.img is None:
+            return
 
-    thresh = 80
+        # cv2.imshow('map', self.img)
+        # cv2.waitKey(0)
 
-    contours, hierarchy = cv2.findContours(
-        cv2.erode((img >= thresh).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
-        cv2.RETR_TREE,
-        cv2.CHAIN_APPROX_TC89_L1)
+        thresh = 80
+        contours, hierarchy = cv2.findContours(
+            cv2.erode((self.img >= thresh).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
+            cv2.RETR_TREE,
+            cv2.CHAIN_APPROX_TC89_L1)
 
-    print(f"got {len(contours)} contours")
+        rospy.logdebug(f"Got {len(contours)} contours")
 
-    with io.StringIO() as f:
-        f.write(f"<svg width='{img.shape[0]}' height='{img.shape[1]}' viewbox='0 0 {img.shape[0]} {img.shape[1]}' "
-                "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
-        for contour in contours:
+        with io.StringIO() as f:
             f.write(
-                f"<path style='fill:none;stroke:#00FFFF44;stroke-width:2px;stroke-opacity:1' stroke-linejoin='round'")
-            f.write(f" d='M {contour[0][0][0]} {contour[0][0][1]}")
-            for (x, y), in contour[1:]:
-                f.write(f"L {x} {y} ")
-            f.write(f"L {contour[0][0][0]} {contour[0][0][1]} ")
+                f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
+                "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+            for contour in contours:
+                f.write(
+                    f"<path style='stroke:{self.stroke_color};stroke-width:2px;stroke-opacity:1' stroke-linecap='round' stroke-linejoin='round'")
+                f.write(f" d='M {contour[0][0][0]} {contour[0][0][1]}")
+                for (x, y), in contour[1:]:
+                    f.write(f"L {x} {y} ")
+                f.write(f"L {contour[0][0][0]} {contour[0][0][1]} ")
 
-            f.write("' />")
-        f.write(f"</svg>")
+                f.write("' />")
+            f.write(f"</svg>")
 
-        f.seek(0)
-        pub.publish(f.read())
+            f.seek(0)
+            self.pub.publish(f.read())
+
+
+def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
+    rospy.loginfo("Received a cost map")
+    c.img = msg.data.reshape(msg.info.height, msg.info.width).astype(np.uint8)
+    c.update()
+
+
+def callback_updates(msg: numpy_msg(OccupancyGridUpdate), c: CommonData):
+    rospy.logdebug("Received a cost map update")
+    if c.img is None:
+        rospy.logwarn("Received update before receiving the cost map")
+        return
+
+    # Note: Axes are flipped
+    c.img[msg.y:msg.y + msg.height, msg.x:msg.x + msg.width] = msg.data.reshape(msg.height, msg.width).astype(np.uint8)
+
+    # cv2.imshow('aa', c.img)
+    # cv2.waitKey(1)
+    c.update()
 
 
 # def process_image()
@@ -51,8 +83,11 @@ def main():
     topic: str = rospy.get_param("~topic", default="/move_base/global_costmap/costmap")
     pub_topic: str = rospy.get_param("~pub_topic", default="/move_base/global_costmap/costmap_svg")
 
-    pub = rospy.Publisher(pub_topic, String, queue_size=1, latch=True)
-    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=pub)
+    c = CommonData(pub=rospy.Publisher(pub_topic, String, queue_size=1, latch=True))
+    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=c)
+    sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
+                                   callback=callback_updates,
+                                   callback_args=c)
     print("created the sub")
     rospy.spin()
 

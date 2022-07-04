@@ -17,16 +17,12 @@ def callback(msg: OccupancyGrid, pub: rospy.Publisher):
 
     img = msg.data.reshape(map_info.height, map_info.width).astype(np.uint8)
 
-    thresh_1 = 30
-    thresh_2 = 80
-    assert thresh_1 <= thresh_2
-
-    print((img <= thresh_1).sum(), ((img <= thresh_2) & (img > thresh_1)).sum(), (img > thresh_2).sum(), )
+    thresh = 80
 
     contours, hierarchy = cv2.findContours(
-        cv2.dilate((img <= thresh_2).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
+        cv2.erode((img >= thresh).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
         cv2.RETR_TREE,
-        cv2.CHAIN_APPROX_TC89_L1)  # cv2.CHAIN_APPROX_SIMPLE)
+        cv2.CHAIN_APPROX_TC89_L1)
 
     print(f"got {len(contours)} contours")
 

@@ -6,11 +6,12 @@ import numpy as np
 import rospy
 from nav_msgs.msg import OccupancyGrid
 from rospy.numpy_msg import numpy_msg
+from std_msgs.msg import String
 
 svg_filename = "out.svg"
 
 
-def callback(msg: OccupancyGrid):
+def callback(msg: OccupancyGrid, pub: rospy.Publisher):
     rospy.loginfo("Received a cost map")
     map_info = msg.info
 
@@ -26,16 +27,7 @@ def callback(msg: OccupancyGrid):
         cv2.dilate((img <= thresh_2).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
         cv2.RETR_TREE,
         cv2.CHAIN_APPROX_TC89_L1)  # cv2.CHAIN_APPROX_SIMPLE)
-    rgb = np.empty((img.shape[0], img.shape[1], 3), np.uint8)
-    rgb[img <= thresh_1, ...] = (0, 0, 0)
-    rgb[(img <= thresh_2) & (img > thresh_1), ...] = (0, 0, 0)
-    rgb[(img > thresh_2), ...] = (0, 255, 0)
 
-    print(f"got {len(contours)} contours")
-    cv2.drawContours(rgb, contours, -1, color=(255, 255, 255), thickness=2)
-
-    cv2.imshow("msg", cv2.resize(rgb, (1000, 1000), interpolation=cv2.INTER_NEAREST_EXACT))
-    cv2.waitKey()
     print(f"got {len(contours)} contours")
 
     with open(svg_filename, 'w') as f:
@@ -59,8 +51,10 @@ def main():
     rospy.init_node("map_to_svg", anonymous=True)
 
     topic: str = rospy.get_param("~topic", default="/move_base/global_costmap/costmap")
+    pub_topic: str = rospy.get_param("~pub_topic", default="/move_base/global_costmap/costmap_svg")
 
-    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback)
+    pub = rospy.Publisher(pub_topic, String, queue_size=1)
+    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=pub)
     print("created the sub")
     rospy.spin()
 

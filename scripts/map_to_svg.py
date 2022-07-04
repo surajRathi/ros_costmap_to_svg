@@ -17,10 +17,10 @@ svg_filename = "out.svg"
 @dataclasses.dataclass
 class CommonData:
     pub: rospy.Publisher
-    thresh: int = 80
-    stroke_color: str = '#00FFFF66'
+    thresh: int = 60
+    erosion_iter: int = 2
     # https://stackoverflow.com/a/61099329/1515394
-    fill_color: str = 'rgb(255, 0, 0)'  # '#00FFFF66'.replace('#', '%23')
+    fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
     fill_opacity: str = '0.4'
     img: Optional[np.ndarray] = None
 
@@ -32,10 +32,10 @@ class CommonData:
         # cv2.waitKey(0)
 
         thresh = 80
-        contours, hierarchy = cv2.findContours(
-            cv2.erode((self.img >= thresh).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
-            cv2.RETR_TREE,
-            cv2.CHAIN_APPROX_TC89_L1)
+        img = (self.img >= thresh).astype(np.uint8)
+        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
+        img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
+        contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
 
         rospy.logdebug(f"Got {len(contours)} contours")
 
@@ -43,10 +43,7 @@ class CommonData:
             f.write(
                 f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
                 "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
-            f.write(
-                f"<path style='stroke:{self.stroke_color};stroke-width:2px;stroke-opacity:1' "
-                f"stroke-linecap='round' stroke-linejoin='round' "
-                f"fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' d='")
+            f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' d='")
             for contour in contours:
 
                 f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")

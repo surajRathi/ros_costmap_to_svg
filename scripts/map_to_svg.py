@@ -39,7 +39,11 @@ class CommonData:
             f.write(
                 f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
                 "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
-            f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' d='")
+            f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' "
+                    f"stroke='none' "
+                    # f"stroke='{self.fill_color}' stroke-width='10' stroke-opacity='{self.fill_opacity}' stroke-linejoin='round' stroke-linecap='round' "
+                    f"d='"
+                    )
             for contour in contours:
 
                 f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")

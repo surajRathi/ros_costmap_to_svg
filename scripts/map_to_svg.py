@@ -22,17 +22,27 @@ def callback(msg: OccupancyGrid):
 
     print((img <= thresh_1).sum(), ((img <= thresh_2) & (img > thresh_1)).sum(), (img > thresh_2).sum(), )
 
-    contours, hierarchy = cv2.findContours((img <= thresh_2).astype(np.uint8), cv2.RETR_TREE,
-                                           cv2.CHAIN_APPROX_TC89_L1)  # cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(
+        cv2.dilate((img <= thresh_2).astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))),
+        cv2.RETR_TREE,
+        cv2.CHAIN_APPROX_TC89_L1)  # cv2.CHAIN_APPROX_SIMPLE)
+    rgb = np.empty((img.shape[0], img.shape[1], 3), np.uint8)
+    rgb[img <= thresh_1, ...] = (0, 0, 0)
+    rgb[(img <= thresh_2) & (img > thresh_1), ...] = (0, 0, 0)
+    rgb[(img > thresh_2), ...] = (0, 255, 0)
 
+    print(f"got {len(contours)} contours")
+    cv2.drawContours(rgb, contours, -1, color=(255, 255, 255), thickness=2)
+
+    cv2.imshow("msg", cv2.resize(rgb, (1000, 1000), interpolation=cv2.INTER_NEAREST_EXACT))
+    cv2.waitKey()
     print(f"got {len(contours)} contours")
 
     with open(svg_filename, 'w') as f:
-        f.write(
-            f"<svg xmlns='http://www.w3.org/2000/svg' width='{int(img.shape[0] * 2)}' height='{int(img.shape[1] * 2)}' viewbox='0 0 {img.shape[0]  // 2} {img.shape[1] // 2}' fill='#044B94' fill-opacity='0.4'>")
-        # f"<svg xmlns='http://www.w3.org/2000/svg' width='{int(img.shape[0] * scale)}' height='{int(img.shape[1] * scale)}' viewbox='0 0 {img.shape[0]} {img.shape[1]}' fill='#044B94' fill-opacity='0.4'>")
+        f.write(f"<svg width='{img.shape[0]}' height='{img.shape[1]}' viewbox='0 0 {img.shape[0]} {img.shape[1]}' "
+                "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
         for contour in contours:
-            f.write(f"<path style='fill:none;stroke:#AAAAAA;stroke-width:2px;stroke-opacity:1' ")
+            f.write(f"<path style='fill:none;stroke:#000000;stroke-width:2px;stroke-opacity:1' stroke-linejoin='round'")
             f.write(f" d='M {contour[0][0][0]} {contour[0][0][1]}")
             print(len(contour), len(contour[0][0]))
             for (x, y), in contour[1:]:

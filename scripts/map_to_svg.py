@@ -18,13 +18,15 @@ class CommonData:
     thresh: int = 20
     erosion_iter: int = 2
     erosion_size: int = 3
-    fill_shape = True
     # https://stackoverflow.com/a/61099329/1515394
     fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
     fill_opacity: str = '0.4'
+    map_walls_fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
+    map_walls_fill_opacity: str = '0.4'
     is_map = False
 
     img: Optional[np.ndarray] = None
+    img_map_walls: Optional[np.ndarray] = None
 
     def update(self):
         if self.img is None:
@@ -43,7 +45,7 @@ class CommonData:
 
         rospy.logdebug(f"Got {len(contours)} contours")
 
-        if self.fill_shape:
+        if not self.is_map:
             with io.StringIO() as f:
                 f.write(
                     f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
@@ -66,16 +68,40 @@ class CommonData:
                 f.seek(0)
                 self.pub.publish(f.read())
         else:
-            print("AAAA")
+            img1 = (self.img_map_walls >= thresh).astype(np.uint8)
+            erosion_shape = (self.erosion_size, self.erosion_size)
+
+            if self.erosion_iter != 0:
+                img1 = cv2.dilate(img1, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+                img1 = cv2.erode(img1, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+                img1 = cv2.erode(img1, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+
+            contours1, hierarchy1 = cv2.findContours(img1, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
+
             with io.StringIO() as f:
                 f.write(
                     f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
-                    "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' > "
-                    f"<path style='stroke:{self.fill_color};stroke-width:2px;stroke-opacity:{self.fill_opacity}' stroke-linecap='round' stroke-linejoin='round'"
-                    f" d='"
-                )
-
+                    "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+                f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' "
+                        f"stroke='none' "
+                        f"d='"
+                        )
                 for contour in contours:
+
+                    f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
+                    for (x, y), in contour[1:]:
+                        f.write(f"L {x} {y} ")
+                    f.write(f"Z ")
+
+                f.write("' />")
+
+                f.write(
+                    f"<path style='stroke-width:0px' fill-opacity='{self.map_walls_fill_opacity}' fill='{self.map_walls_fill_color}' "
+                    f"stroke='none' "
+                    f"d='"
+                )
+                for contour in contours1:
+
                     f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
                     for (x, y), in contour[1:]:
                         f.write(f"L {x} {y} ")
@@ -91,9 +117,8 @@ class CommonData:
 def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
     if c.is_map:
         rospy.loginfo("Received a cost map")
-        print(sorted(set(msg.data)), (msg.data.reshape(msg.info.height, msg.info.width) == 100).sum())
-        c.img = (msg.data.reshape(msg.info.height, msg.info.width) == 100).astype(np.uint8) * 255
-        print(sorted(set(c.img.reshape(-1).tolist())))
+        c.img = (msg.data.reshape(msg.info.height, msg.info.width) == 0).astype(np.uint8) * 255
+        c.img_map_walls = (msg.data.reshape(msg.info.height, msg.info.width) == 100).astype(np.uint8) * 255
         # cv2.imshow('aa', c.img)
         # cv2.waitKey(1)
         c.update()
@@ -125,9 +150,11 @@ def main():
     g_topic: str = '/map'
 
     g_data = CommonData(pub=rospy.Publisher(g_topic + '_svg', String, queue_size=1, latch=True))
-    g_data.fill_color = f"rgb(0, 0, {int(255 * 0.8)})"
+    g_data.fill_color = f"rgb(224, 224, 224)"
+    g_data.map_walls_fill_color = f"rgb(30, 30, 30)"
     g_data.is_map = True
     g_data.fill_opacity = '1.0'
+    g_data.map_walls_fill_opacity = '1.0'
     g_data.erosion_iter = 0
     g_sub = rospy.Subscriber(g_topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=g_data)
     g_sub_updates = rospy.Subscriber(g_topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,

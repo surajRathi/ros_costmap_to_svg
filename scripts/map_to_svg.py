@@ -17,9 +17,13 @@ class CommonData:
     pub: rospy.Publisher
     thresh: int = 20
     erosion_iter: int = 2
+    erosion_size: int = 3
+    fill_shape = True
     # https://stackoverflow.com/a/61099329/1515394
     fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
     fill_opacity: str = '0.4'
+    is_map = False
+
     img: Optional[np.ndarray] = None
 
     def update(self):
@@ -28,37 +32,73 @@ class CommonData:
 
         thresh = 80
         img = (self.img >= thresh).astype(np.uint8)
-        img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
-        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
-        img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), self.erosion_iter)
+        erosion_shape = (self.erosion_size, self.erosion_size)
+
+        if self.erosion_iter != 0:
+            img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+            img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+            img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
+
         contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
 
         rospy.logdebug(f"Got {len(contours)} contours")
 
-        with io.StringIO() as f:
-            f.write(
-                f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
-                "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
-            f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' "
-                    f"stroke='none' "
-                    # f"stroke='{self.fill_color}' stroke-width='10' stroke-opacity='{self.fill_opacity}' stroke-linejoin='round' stroke-linecap='round' "
-                    f"d='"
-                    )
-            for contour in contours:
+        if self.fill_shape:
+            with io.StringIO() as f:
+                f.write(
+                    f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
+                    "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+                f.write(f"<path style='stroke-width:0px' fill-opacity='{self.fill_opacity}' fill='{self.fill_color}' "
+                        f"stroke='none' "
+                        # f"stroke='{self.fill_color}' stroke-width='10' stroke-opacity='{self.fill_opacity}' stroke-linejoin='round' stroke-linecap='round' "
+                        f"d='"
+                        )
+                for contour in contours:
 
-                f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
-                for (x, y), in contour[1:]:
-                    f.write(f"L {x} {y} ")
-                f.write(f"Z ")
+                    f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
+                    for (x, y), in contour[1:]:
+                        f.write(f"L {x} {y} ")
+                    f.write(f"Z ")
 
-            f.write("' />")
-            f.write(f"</svg>")
+                f.write("' />")
+                f.write(f"</svg>")
 
-            f.seek(0)
-            self.pub.publish(f.read())
+                f.seek(0)
+                self.pub.publish(f.read())
+        else:
+            print("AAAA")
+            with io.StringIO() as f:
+                f.write(
+                    f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
+                    "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' > "
+                    f"<path style='stroke:{self.fill_color};stroke-width:2px;stroke-opacity:{self.fill_opacity}' stroke-linecap='round' stroke-linejoin='round'"
+                    f" d='"
+                )
+
+                for contour in contours:
+                    f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
+                    for (x, y), in contour[1:]:
+                        f.write(f"L {x} {y} ")
+                    f.write(f"Z ")
+
+                f.write("' />")
+                f.write(f"</svg>")
+
+                f.seek(0)
+                self.pub.publish(f.read())
 
 
 def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
+    if c.is_map:
+        rospy.loginfo("Received a cost map")
+        print(sorted(set(msg.data)), (msg.data.reshape(msg.info.height, msg.info.width) == 100).sum())
+        c.img = (msg.data.reshape(msg.info.height, msg.info.width) == 100).astype(np.uint8) * 255
+        print(sorted(set(c.img.reshape(-1).tolist())))
+        # cv2.imshow('aa', c.img)
+        # cv2.waitKey(1)
+        c.update()
+
+        return
     rospy.loginfo("Received a cost map")
     c.img = msg.data.reshape(msg.info.height, msg.info.width).astype(np.uint8)
     c.update()
@@ -82,10 +122,13 @@ def callback_updates(msg: numpy_msg(OccupancyGridUpdate), c: CommonData):
 def main():
     rospy.init_node("map_to_svg", anonymous=True)
 
-    g_topic: str = '/move_base/global_costmap/costmap'
+    g_topic: str = '/map'
 
     g_data = CommonData(pub=rospy.Publisher(g_topic + '_svg', String, queue_size=1, latch=True))
     g_data.fill_color = f"rgb(0, 0, {int(255 * 0.8)})"
+    g_data.is_map = True
+    g_data.fill_opacity = '1.0'
+    g_data.erosion_iter = 0
     g_sub = rospy.Subscriber(g_topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=g_data)
     g_sub_updates = rospy.Subscriber(g_topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
                                      callback=callback_updates,
@@ -95,6 +138,8 @@ def main():
 
     data = CommonData(pub=rospy.Publisher(topic + '_svg', String, queue_size=1, latch=True))
     data.fill_color = f"rgb({int(255 * 0.8)}, 0, 0)"
+    data.fill_opacity = "1.0"
+    data.thresh = 50
     sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=data)
     sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
                                    callback=callback_updates,

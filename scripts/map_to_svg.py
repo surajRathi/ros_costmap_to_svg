@@ -1,7 +1,7 @@
 #! /usr/bin/python3
 import dataclasses
 import io
-from typing import Optional
+from typing import Optional, List
 
 import cv2
 import numpy as np
@@ -15,9 +15,9 @@ from std_msgs.msg import String
 @dataclasses.dataclass
 class CommonData:
     pub: rospy.Publisher
-    thresh: int = 20
+    thresh: int = 50
     erosion_iter: int = 2
-    erosion_size: int = 3
+    erosion_size: int = 4
     # https://stackoverflow.com/a/61099329/1515394
     fill_color: str = f"rgb(0, 0, {int(255 * 0.8)})"
     fill_opacity: str = '0.4'
@@ -34,11 +34,13 @@ class CommonData:
         erosion_shape = (self.erosion_size, self.erosion_size)
 
         if self.erosion_iter != 0:
+            img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
             img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
             img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
-            img = cv2.erode(img, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, erosion_shape), self.erosion_iter)
 
+        contours: List[np.ndarray]
         contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
+        # contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_TC89_L1)
 
         rospy.logdebug(f"Got {len(contours)} contours")
 
@@ -53,21 +55,38 @@ class CommonData:
                     )
             for contour in contours:
                 f.write(f" M {contour[0][0][0]} {contour[0][0][1]} ")
-                for ((xo, yo),), ((x, y),) in zip(contour[:-1], contour[1:]):
-                    xc, yc = (xo + x) // 2, (yo + y) // 2
+                for ((xo, yo),), ((x, y),), ((xn, yn),) in zip(contour[:-1], contour[1:], np.roll(contour, -1)[1:]):
+                    th_o = np.arctan2(yo - y, xo - x)
+                    th_r = np.arctan2(y - yn, x - xn)
+                    th_t = 0.8 * th_o + th_r * 0.2
+                    # l = 0.1 * min(np.sqrt((x - xo) ** 2 + (y - yo) ** 2), np.sqrt((x - xn) ** 2 + (y - yn) ** 2))
+                    # l = 0.3 * np.sqrt((x - xo) ** 2 + (y - yo) ** 2) # , np.sqrt((x - xn) ** 2 + (y - yn) ** 2))
+                    l = 2
+                    xc = x + l * np.cos(th_t)
+                    yc = y + l * np.sin(th_t)
+                    # print(xc, yc, th_t)
                     f.write(f"S {int(xc)} {int(yc)}, {x} {y} ")
                 f.write(f"Z ")
 
             f.write("' />")
 
-            for contour in contours:
-                for (x, y), in contour:
-                    f.write(f"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" stroke=\"black\" stroke-width=\"1\" fill=\"black\" />")
-
-            for contour in contours:
-                for ((xo, yo),), ((x, y),) in zip(contour[:-1], contour[1:]):
-                    xc, yc = (xo + x) // 2, (yo + y) // 2
-                    f.write(f"<circle cx=\"{xc}\" cy=\"{yc}\" r=\"1\" stroke=\"none\" stroke-width=\"0\" fill=\"green\" />")
+            # for contour in contours:
+            #     for (x, y), in contour:
+            #         f.write(
+            #             f"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" stroke=\"none\" stroke-width=\"0\" fill=\"black\" />")
+            #
+            # for contour in contours:
+            #     for ((xo, yo),), ((x, y),), ((xn, yn),) in zip(contour[:-1], contour[1:], np.roll(contour, -1)[1:]):
+            #         th_o = np.arctan2(yo - y, xo - x)
+            #         th_r = np.arctan2(y - yn, x - xn)
+            #         th_t = 0.8 * th_o + th_r * 0.2
+            #         # l = 0.1 * min(np.sqrt((x - xo) ** 2 + (y - yo) ** 2), np.sqrt((x - xn) ** 2 + (y - yn) ** 2))
+            #         # l = 0.3 * np.sqrt((x - xo) ** 2 + (y - yo) ** 2) # , np.sqrt((x - xn) ** 2 + (y - yn) ** 2))
+            #         l = 2
+            #         xc = x + l * np.cos(th_t)
+            #         yc = y + l * np.sin(th_t)
+            #         f.write(
+            #             f"<circle cx=\"{int(xc)}\" cy=\"{int(yc)}\" r=\"1\" stroke=\"none\" stroke-width=\"0\" fill=\"green\" />")
 
             f.write(f"</svg>")
 

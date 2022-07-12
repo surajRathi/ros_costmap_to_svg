@@ -2,6 +2,7 @@
 import dataclasses
 from typing import Optional
 
+import cv2
 import numpy as np
 import rospy
 from map_msgs.msg import OccupancyGridUpdate
@@ -19,7 +20,20 @@ class CommonData:
     def update(self):
         if self.img is None:
             return
-        pass
+
+        # edges = cv2.bitwise_and((self.img == 255).astype('uint8') * 255,
+        edges = cv2.dilate((self.img == 0).astype('uint8') * 255, cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)), 1) \
+                & self.img
+
+        out = np.repeat(self.img[..., np.newaxis], 3, axis=-1)
+        lines = cv2.HoughLinesP(edges, 3, np.pi / 180, 20)
+        for (l,) in lines:
+            cv2.line(out, (l[0], l[1]), (l[2], l[3]), (0, 0, 255), 3, cv2.LINE_AA)
+
+        print(lines)
+        cv2.imshow('aa', edges)
+        cv2.imshow('aa', out)
+        cv2.waitKey(1)
 
 
 def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
@@ -53,7 +67,7 @@ def main():
     sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
                                    callback=callback_updates,
                                    callback_args=data)
-    print("created the sub")
+
     rospy.spin()
 
 

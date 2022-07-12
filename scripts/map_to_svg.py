@@ -93,8 +93,8 @@ def main():
 
     data = CommonData(pub=rospy.Publisher(topic + '_svg', String, queue_size=1, latch=True))
     data.fill_color = f"rgb({int(255 * 0.8)}, 0, 0)"
-    data.fill_opacity = "1.0"
-    data.thresh = 20
+    data.fill_opacity = "0.6"
+    data.thresh = 60
     sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=data)
     sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
                                    callback=callback_updates,

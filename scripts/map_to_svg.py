@@ -52,13 +52,23 @@ class CommonData:
                     f"d='"
                     )
             for contour in contours:
-
-                f.write(f" M {contour[0][0][0]} {contour[0][0][1]}")
-                for (x, y), in contour[1:]:
-                    f.write(f"L {x} {y} ")
+                f.write(f" M {contour[0][0][0]} {contour[0][0][1]} ")
+                for ((xo, yo),), ((x, y),) in zip(contour[:-1], contour[1:]):
+                    xc, yc = (xo + x) // 2, (yo + y) // 2
+                    f.write(f"S {int(xc)} {int(yc)}, {x} {y} ")
                 f.write(f"Z ")
 
             f.write("' />")
+
+            for contour in contours:
+                for (x, y), in contour:
+                    f.write(f"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" stroke=\"black\" stroke-width=\"1\" fill=\"black\" />")
+
+            for contour in contours:
+                for ((xo, yo),), ((x, y),) in zip(contour[:-1], contour[1:]):
+                    xc, yc = (xo + x) // 2, (yo + y) // 2
+                    f.write(f"<circle cx=\"{xc}\" cy=\"{yc}\" r=\"1\" stroke=\"none\" stroke-width=\"0\" fill=\"green\" />")
+
             f.write(f"</svg>")
 
             f.seek(0)

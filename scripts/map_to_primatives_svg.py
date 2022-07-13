@@ -75,9 +75,13 @@ class CommonData:
             f.write(
                 f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
                 "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+            f.write(f"<rect x='0' y='0' width='{self.img.shape[0]}' height='{self.img.shape[1]}' fill='#eee'/>")
             stroke_color = '#FF0000'
             for (l,) in lines:
-                f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' stroke-width='{thickness}' stroke='{stroke_color}' />")
+                f.write(
+                    f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' "
+                    f"stroke-width='{thickness}' stroke='{stroke_color}' "
+                    f"class='obstacles' />")
 
             f.write("</svg>")
 

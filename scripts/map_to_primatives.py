@@ -16,6 +16,7 @@ class CommonData:
     pub: rospy.Publisher
 
     img: Optional[np.ndarray] = None
+    scale: Optional[float] = None
 
     def update(self):
         if self.img is None:
@@ -25,21 +26,34 @@ class CommonData:
         edges = cv2.dilate((self.img == 0).astype('uint8') * 255, cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)), 1) \
                 & self.img
 
-        out = np.repeat(self.img[..., np.newaxis], 3, axis=-1)
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 360, 15)
-        for (l,) in lines:
-            # color = tuple((np.random.random((3,)) * 255).astype(np.uint8))
-            color = (0, 255, 0)
-            cv2.line(out, (l[0], l[1]), (l[2], l[3]),
-                     color=color, thickness=2, lineType=cv2.LINE_AA)
+        lines = cv2.HoughLinesP(edges,
+                                rho=max(1, int(10 / self.scale)), theta=np.pi / 180,
+                                threshold=max(1, int(100 / self.scale / self.scale)),
+                                minLineLength=max(1, int(60 / self.scale)),
+                                maxLineGap=max(1, int(20 / self.scale))
+                                )
+        thickness = max(1, int(20 / self.scale))
 
-        cv2.imshow('aa', edges)
-        cv2.imshow('aa', out)
+        line_mask = np.zeros_like(edges)
+        for (l,) in lines:
+            cv2.line(line_mask, (l[0], l[1]), (l[2], l[3]), (255,), thickness=thickness, lineType=cv2.LINE_8)
+
+        out = np.repeat(self.img[..., np.newaxis], 3, axis=-1)
+        for (l,) in lines:
+            color = tuple(map(int, np.random.randint(0, 256, 3)))
+            cv2.line(out, (l[0], l[1]), (l[2], l[3]), color, thickness=thickness, lineType=cv2.LINE_AA)
+
+        cv2.imshow('lines', cv2.resize(out, (out.shape[1] * self.scale, out.shape[0] * self.scale), interpolation=cv2.INTER_NEAREST))
         cv2.waitKey(20)
 
     def callback(self, msg: numpy_msg(OccupancyGrid)):
         rospy.loginfo("Received a cost map")
+        if msg.info.resolution < 0.01 - 0.001:
+            rospy.logerr("Package is designed for maps with a resolution greater than 0.01 only. Failing")
+            return
         self.img = msg.data.reshape(msg.info.height, msg.info.width).astype(np.uint8)
+        self.scale = max(1, msg.info.resolution / 0.01)
+        rospy.loginfo(f"{self.scale=}")
         self.update()
 
     def callback_updates(self, msg: numpy_msg(OccupancyGridUpdate)):

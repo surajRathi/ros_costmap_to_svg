@@ -27,7 +27,7 @@ class CommonData:
                 & self.img
 
         lines = cv2.HoughLinesP(edges,
-                                rho=max(1, int(10 / self.scale)), theta=np.pi / 180,
+                                rho=max(1, int(5 / self.scale)), theta=np.pi / 180,
                                 threshold=max(1, int(100 / self.scale / self.scale)),
                                 minLineLength=max(1, int(60 / self.scale)),
                                 maxLineGap=max(1, int(20 / self.scale))
@@ -37,13 +37,19 @@ class CommonData:
         line_mask = np.zeros_like(edges)
         for (l,) in lines:
             cv2.line(line_mask, (l[0], l[1]), (l[2], l[3]), (255,), thickness=thickness, lineType=cv2.LINE_8)
+        # cv2.dilate  # The thickness kind of dilates it already, can we leave this?
+        edges[line_mask == 255] = 0
+
 
         out = np.repeat(self.img[..., np.newaxis], 3, axis=-1)
         for (l,) in lines:
             color = tuple(map(int, np.random.randint(0, 256, 3)))
             cv2.line(out, (l[0], l[1]), (l[2], l[3]), color, thickness=thickness, lineType=cv2.LINE_AA)
 
-        cv2.imshow('lines', cv2.resize(out, (out.shape[1] * self.scale, out.shape[0] * self.scale), interpolation=cv2.INTER_NEAREST))
+        cv2.imshow('lines', cv2.resize(out, (int(out.shape[1] * self.scale), int(out.shape[0] * self.scale)),
+                                       interpolation=cv2.INTER_NEAREST))
+        cv2.imshow('edges', cv2.resize(edges, (int(edges.shape[1] * self.scale), int(edges.shape[0] * self.scale)),
+                                       interpolation=cv2.INTER_NEAREST))
         cv2.waitKey(20)
 
     def callback(self, msg: numpy_msg(OccupancyGrid)):

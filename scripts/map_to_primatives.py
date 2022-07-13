@@ -37,25 +37,22 @@ class CommonData:
         cv2.imshow('aa', out)
         cv2.waitKey(20)
 
+    def callback(self, msg: numpy_msg(OccupancyGrid)):
+        rospy.loginfo("Received a cost map")
+        self.img = msg.data.reshape(msg.info.height, msg.info.width).astype(np.uint8)
+        self.update()
 
-def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
-    rospy.loginfo("Received a cost map")
-    c.img = msg.data.reshape(msg.info.height, msg.info.width).astype(np.uint8)
-    c.update()
+    def callback_updates(self, msg: numpy_msg(OccupancyGridUpdate)):
+        rospy.logdebug("Received a cost map update")
+        if self.img is None:
+            rospy.logwarn("Received update before receiving the cost map")
+            return
 
+        # Note: Axes are flipped
+        self.img[msg.y:msg.y + msg.height, msg.x:msg.x + msg.width] = msg.data.reshape(msg.height, msg.width).astype(
+            np.uint8)
 
-def callback_updates(msg: numpy_msg(OccupancyGridUpdate), c: CommonData):
-    rospy.logdebug("Received a cost map update")
-    if c.img is None:
-        rospy.logwarn("Received update before receiving the cost map")
-        return
-
-    # Note: Axes are flipped
-    c.img[msg.y:msg.y + msg.height, msg.x:msg.x + msg.width] = msg.data.reshape(msg.height, msg.width).astype(np.uint8)
-
-    # cv2.imshow('aa', c.img)
-    # cv2.waitKey(1)
-    c.update()
+        self.update()
 
 
 # def process_image()
@@ -65,10 +62,9 @@ def main():
     topic: str = '/map'
 
     data = CommonData(pub=rospy.Publisher(topic + '_svg', String, queue_size=1, latch=True))
-    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=data)
+    sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=data.callback)
     # sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
-    #                                callback=callback_updates,
-    #                                callback_args=data)
+    #                                callback=data.callback_updates)
 
     rospy.spin()
 

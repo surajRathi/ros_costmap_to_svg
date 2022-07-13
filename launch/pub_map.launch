@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="map_server" type="map_server" name="pub_tata_map"
+          args="'$(find map_to_svg)/data/maps/tata_7thmarch_long.yaml'"/>
+</launch>

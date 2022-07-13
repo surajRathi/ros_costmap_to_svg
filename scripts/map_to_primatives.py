@@ -26,14 +26,16 @@ class CommonData:
                 & self.img
 
         out = np.repeat(self.img[..., np.newaxis], 3, axis=-1)
-        lines = cv2.HoughLinesP(edges, 3, np.pi / 180, 20)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 360, 15)
         for (l,) in lines:
-            cv2.line(out, (l[0], l[1]), (l[2], l[3]), (0, 0, 255), 3, cv2.LINE_AA)
+            # color = tuple((np.random.random((3,)) * 255).astype(np.uint8))
+            color = (0, 255, 0)
+            cv2.line(out, (l[0], l[1]), (l[2], l[3]),
+                     color=color, thickness=2, lineType=cv2.LINE_AA)
 
-        print(lines)
         cv2.imshow('aa', edges)
         cv2.imshow('aa', out)
-        cv2.waitKey(1)
+        cv2.waitKey(20)
 
 
 def callback(msg: numpy_msg(OccupancyGrid), c: CommonData):
@@ -64,9 +66,9 @@ def main():
 
     data = CommonData(pub=rospy.Publisher(topic + '_svg', String, queue_size=1, latch=True))
     sub = rospy.Subscriber(topic, numpy_msg(OccupancyGrid), queue_size=1, callback=callback, callback_args=data)
-    sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
-                                   callback=callback_updates,
-                                   callback_args=data)
+    # sub_updates = rospy.Subscriber(topic + "_updates", numpy_msg(OccupancyGridUpdate), queue_size=1,
+    #                                callback=callback_updates,
+    #                                callback_args=data)
 
     rospy.spin()
 

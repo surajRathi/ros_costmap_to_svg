@@ -55,7 +55,6 @@ class CommonData:
         self.update()
 
 
-# def process_image()
 def main():
     rospy.init_node("map_to_svg", anonymous=True)
 

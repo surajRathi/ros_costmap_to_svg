@@ -1,5 +1,6 @@
 #! /usr/bin/python3
 import dataclasses
+import io
 from typing import Optional
 
 import cv2
@@ -70,12 +71,18 @@ class CommonData:
         #     # draw the center of the circle
         #     cv2.circle(out, (c[0], c[1]), 2, (0, 0, 255), 3)
 
-        cv2.imshow('lines', cv2.resize(out, (int(out.shape[1] * self.scale), int(out.shape[0] * self.scale)),
-                                       interpolation=cv2.INTER_NEAREST))
-        cv2.imshow('obs', cv2.resize(obs, (int(obs.shape[1] * self.scale), int(obs.shape[0] * self.scale)),
-                                     interpolation=cv2.INTER_NEAREST))
-        # cv2.imshow('aa', (self.img == 100).astype('uint8') * 255)
-        cv2.waitKey(20)
+        with io.StringIO() as f:
+            f.write(
+                f"<svg width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewbox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
+                "fill='#044B94' fill-opacity='0.4' xmlns='http://www.w3.org/2000/svg' >")
+            stroke_color = '#FF0000'
+            for (l,) in lines:
+                f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' stroke-width='{thickness}' stroke='{stroke_color}' />")
+
+            f.write("</svg>")
+
+            f.seek(0)
+            print(f.read())
 
     def callback(self, msg: numpy_msg(OccupancyGrid)):
         rospy.loginfo("Received a cost map")

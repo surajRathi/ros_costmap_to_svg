@@ -212,10 +212,14 @@ class MapPublisher:
         return resp
 
     def start_editing(self, req: StartEditingRequest) -> StartEditingResponse:
+        if not self.loaded:
+            resp = StartEditingResponse()
+            return resp
         svg_file = pathlib.Path(self.data_dir) / self.name / 'map.svg'
         if not svg_file.exists():
             self.create_svg()
         resp = StartEditingResponse()
+        resp.success = 1
         resp.svg_data = svg_file.open('r').read()
         resp.raw_png = self.as_base64_svg_editor_bg()
         return resp

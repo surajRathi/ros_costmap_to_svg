@@ -4,6 +4,7 @@ import io
 import pathlib
 from typing import Optional, Tuple, Callable
 
+import cv2
 import numpy as np
 import rospy
 import yaml
@@ -211,7 +212,13 @@ class MapPublisher:
         return resp
 
     def start_editing(self, req: StartEditingRequest) -> StartEditingResponse:
-        return StartEditingResponse()
+        svg_file = pathlib.Path(self.data_dir) / self.name / 'map.svg'
+        if not svg_file.exists():
+            self.create_svg()
+        resp = StartEditingResponse()
+        resp.svg_data = svg_file.open('r').read()
+        resp.raw_png = self.as_base64_svg_editor_bg()
+        return resp
 
     def finish_editing(self, req: FinishEditingRequest) -> FinishEditingResponse:
         return FinishEditingResponse()
@@ -246,6 +253,8 @@ class MapPublisher:
         self.meta_pub.publish(self.meta_data)
         self.map_pub.publish(self.map_data)
         rospy.loginfo('Publishing to the topic map and map_metadata.')
+
+        self.create_svg()
         return True
 
     def as_base64_svg_editor_bg(self) -> str:
@@ -266,6 +275,41 @@ class MapPublisher:
             Image.fromarray(image).save(f, 'PNG')
             f.seek(0)
             return base64.b64encode(f.read()).decode('ASCII')
+
+    def create_svg(self):
+        if not self.loaded:
+            return ''
+        scale = max(1, self.map_data.info.resolution / 0.01)
+        img = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
+
+        edges = cv2.dilate((img == 0).astype('uint8') * 255, cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)), 1) \
+                & ((img == 100).astype('uint8') * 255)
+
+        lines = cv2.HoughLinesP(edges,
+                                rho=max(1, int(5 / scale)), theta=np.pi / 180,
+                                threshold=max(1, int(100 / scale / scale)),
+                                minLineLength=max(1, int(60 / scale)),
+                                maxLineGap=max(1, int(20 / scale))
+                                )
+
+        thickness = max(1, int(20 / scale))
+        line_mask = np.zeros_like(edges)
+        for (l,) in lines:
+            cv2.line(line_mask, (l[0], l[1]), (l[2], l[3]), (255,), thickness=thickness, lineType=cv2.LINE_8)
+        # cv2.dilate  # The thickness kind of dilates it already, can we leave this?
+        # print(img.max(), img.min(), (img == 0).sum(), (img == 100).sum(), (img == 255).sum())
+        obs = ((img == 100).astype('uint8') * 255) & ~line_mask
+
+        with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
+            f.write(
+                f"<svg xmlns='http://www.w3.org/2000/svg' width='{img.shape[0]}' height='{img.shape[1]}' viewBox='0 0 {img.shape[0]} {img.shape[1]}'>\n")
+
+            f.write(f"<rect x='0' y='0' class='bg' width='{img.shape[0]}' height='{img.shape[1]}' />\n")
+
+            for (l,) in lines:
+                f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' class='item obstacle' />\n")
+
+            f.write("</svg>")
 
 
 def main():

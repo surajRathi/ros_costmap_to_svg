@@ -1,10 +1,10 @@
 #! /usr/bin/python3
 import pathlib
-from typing import Optional, Tuple
-import yaml
+from typing import Optional, Tuple, Callable
 
 import numpy as np
 import rospy
+import yaml
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import MapMetaData
 
@@ -56,7 +56,7 @@ def check_map_dir(name: str, data_dir: str) -> bool:
     return True
 
 
-def read_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
+def read_yaml(path: pathlib.Path) -> Optional[Tuple[MapMetaData, Callable[[np.ndarray], np.ndarray]]]:
     with path.open('r') as f:
         try:
             data = yaml.safe_load(f)
@@ -69,7 +69,41 @@ def read_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
             m.origin = Pose()
             m.origin.position.x, m.origin.position.y, m.origin.position.z = data['origin']
             m.origin.orientation.w = 1
-            return m
+
+            negate = bool(data['negate'])
+            occupied_thresh = float(data['occupied_thresh'])
+            free_thresh = float(data['free_thresh'])
+
+            mode = data['mode'] if 'mode' in data else 'trinary'
+            if mode not in ('trinary', 'scale', 'raw'):
+                rospy.logerr(f"Invalid mode {mode}, should be one of 'trinary', 'scale', or 'raw'.")
+
+            def value_interpreter(arr: np.ndarray):
+                if not negate:
+                    arr = 255 - arr
+
+                if mode == 'trinary':
+                    out = np.zeros_like(arr).astype(np.uint8)
+                    out[...] = 255
+                    out[arr > (occupied_thresh * 255)] = 100
+                    out[arr < (free_thresh * 255)] = 0
+                    return out
+                if mode == 'scale':
+                    out = np.zeros_like(arr).astype(np.uint8)
+                    out[...] = 255
+                    out[arr > occupied_thresh * 255] = 100
+                    out[arr < free_thresh * 255] = 0
+                    out[out == 255] = (
+                            99 * (arr[out == 255] - free_thresh * 255) / (255 * (occupied_thresh - free_thresh))
+                    ).astype(np.uint8)
+
+                    return out
+                if mode == 'raw':
+                    return arr
+
+                assert False
+
+            return m, value_interpreter
 
         except yaml.YAMLError as exc:
             rospy.logerr(f"Could not read the YAML file {path}, {exc}")
@@ -122,7 +156,7 @@ class MapPublisher:
         if not check_map_dir(name, data_dir):
             return False
 
-        self.meta_data = read_yaml(pathlib.Path(data_dir) / name / 'map.yaml')
+        self.meta_data, value_interpreter = read_yaml(pathlib.Path(data_dir) / name / 'map.yaml')
         if self.meta_data is None:
             rospy.logerr("Could not load the yaml file.")
             return False
@@ -133,9 +167,10 @@ class MapPublisher:
             return False
 
         self.data, self.max_val = read_pgm_ret
+        self.data = value_interpreter(self.data)
         self.meta_data.width, self.meta_data.height = self.data.shape
 
-        print(self.meta_data)
+        print(self.meta_data, np.unique(self.data), sep='\n')
         return True
 
     def update_map(self):

@@ -11,6 +11,7 @@ from PIL import Image
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from rospy.numpy_msg import numpy_msg
+from map_to_svg.srv import SetMap, SetMapRequest, SetMapResponse
 
 """
 Contents of a map directory:
@@ -147,30 +148,49 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
 
 
 class MapPublisher:
-    def __init__(self, frame_id: str, name: str, data_dir: str):
+    def __init__(self, frame_id: str, data_dir: str, name: Optional[str] = None):
         self.loaded = False
         self.data: Optional[np.ndarray] = None
         self.meta_data: Optional[MapMetaData] = None
         self.map_data: Optional[numpy_msg(OccupancyGrid)] = None
 
         self.frame_id = frame_id
+        self.data_dir = data_dir
+        self.name = name
 
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
 
-        if self.load(name, data_dir):
-            self.loaded = True
+        self.set_map_srv = rospy.Service('set_map_srv', SetMap, self.set_map)
+        if self.name is not None:
+            self.loaded = self.load()
 
-    def load(self, name: str, data_dir: str) -> bool:  # Success
-        if not check_map_dir(name, data_dir):
+    def set_map(self, req: SetMapRequest) -> SetMapResponse:
+        resp = SetMapResponse()
+
+        if req.map == '':
+            resp.set_map = '' if self.name is None else self.name
+        else:
+            self.name = req.map
+            self.loaded = self.load()
+            if not self.loaded:
+                self.name = None
+            resp.set_map = '' if self.name is None else self.name
+
+        return resp
+
+    def load(self) -> bool:  # Success
+        if self.name is None:
+            return False
+        if not check_map_dir(self.name, self.data_dir):
             return False
 
-        self.meta_data, value_interpreter = read_yaml(pathlib.Path(data_dir) / name / 'map.yaml')
+        self.meta_data, value_interpreter = read_yaml(pathlib.Path(self.data_dir) / self.name / 'map.yaml')
         if self.meta_data is None:
             rospy.logerr("Could not load the yaml file.")
             return False
 
-        map_arr = read_pgm(pathlib.Path(data_dir) / name / 'map.pgm')
+        map_arr = read_pgm(pathlib.Path(self.data_dir) / self.name / 'map.pgm')
         if map_arr is None:
             rospy.logerr("Could not load the pgm file.")
             return False
@@ -217,7 +237,7 @@ def main():
     data_dir: str = '/home/suraj/ws/src/rosjs/map_to_svg/data/final'
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
-    m = MapPublisher(frame_id, 'tb3', data_dir)
+    m = MapPublisher(frame_id, data_dir, 'tb3')
     rospy.spin()
 
 

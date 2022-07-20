@@ -266,14 +266,12 @@ class MapPublisher:
             return ''
 
         # Returns a base64 encoded png of the map
-        # The PNG is flipped in the x (rows) axis.
-        # Only implemented for trinary
 
         image = np.zeros((self.meta_data.width, self.meta_data.height, 3), dtype=np.uint8)
         image[...] = (93, 100, 108)  # for im_like == -1
         im_like = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
-        image[im_like[::-1, :] == 100] = (14, 14, 14)
-        image[im_like[::-1, :] == 0] = (193, 193, 193)
+        image[im_like[:, :] == 100] = (14, 14, 14)
+        image[im_like[:, :] == 0] = (193, 193, 193)
 
         with io.BytesIO() as f:
             Image.fromarray(image).save(f, 'PNG')

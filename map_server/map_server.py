@@ -145,7 +145,7 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
 
 class MapPublisher:
     def __init__(self, frame_id: str, name: str, data_dir: str):
-        self.is_init = False
+        self.loaded = False
         self.data: Optional[np.ndarray] = None
         self.meta_data: Optional[MapMetaData] = None
         self.map_data: Optional[numpy_msg(OccupancyGrid)] = None
@@ -155,10 +155,10 @@ class MapPublisher:
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
 
-        if self.init(name, data_dir):
-            self.is_init = True
+        if self.load(name, data_dir):
+            self.loaded = True
 
-    def init(self, name: str, data_dir: str) -> bool:  # Success
+    def load(self, name: str, data_dir: str) -> bool:  # Success
         if not check_map_dir(name, data_dir):
             return False
 
@@ -188,15 +188,12 @@ class MapPublisher:
         rospy.loginfo('Publishing to the topic map and map_metadata.')
         return True
 
-    def update_map(self):
-        pass
-
 
 def main():
     rospy.init_node("map_server")
 
     data_dir: str = '/home/suraj/ws/src/rosjs/map_to_svg/data/final'
-    frame_id: str = 'map'
+    frame_id: str = rospy.get_param('~frame_id', 'map')
 
     m = MapPublisher(frame_id, 'tb3', data_dir)
     rospy.spin()

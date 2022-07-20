@@ -104,6 +104,8 @@ def load_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
         except yaml.YAMLError as exc:
             rospy.logerr(f"Could not read the YAML file {path}, {exc}")
             return None
+        except KeyError as e:
+            rospy.logerr(f"The YAML file at {path} is missing the {e} key.")
 
 
 class MapPublisher:
@@ -132,6 +134,8 @@ class MapPublisher:
 
         self.data, self.max_val = read_pgm_ret
         self.meta_data.width, self.meta_data.height = self.data.shape
+
+        print(self.meta_data)
         return True
 
     def update_map(self):

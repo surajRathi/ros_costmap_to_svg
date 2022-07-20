@@ -20,36 +20,6 @@ Either one of `map.pgm` and `map.svg` must exist.
 """
 
 
-def read_pgm(file: pathlib.Path) -> Optional[Tuple[np.ndarray, int]]:
-    if not file.is_file():
-        return None
-
-    with file.open('rb') as f:
-        # https://users.wpi.edu/~cfurlong/me-593n/pgmimage.html
-        try:
-            p5, comment, dims, max_val = f.readline(), f.readline(), f.readline(), f.readline()
-            if p5 != b"P5\n":
-                rospy.logerr("Invlid PGM File")
-                return None
-            rows, cols = map(int, dims.decode('ASCII').strip().split(' '))
-            maximum_value = int(max_val.decode('ASCII').strip())
-            if maximum_value > 255:
-                rospy.logerr(f"No support for reading pgm files with max value greater than {maximum_value}")
-                return None
-
-            map_data = f.read()
-            if len(map_data) != rows * cols:
-                rospy.logerr(f"Invalid PGM file read {len(map_data)}, expected {rows * cols}.")
-                return None
-
-            arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
-            return arr, maximum_value
-
-        except None:
-            print("Error")
-            return None
-
-
 def check_map_dir(name: str, data_dir: str) -> bool:
     base = pathlib.Path(data_dir)
     if not base.exists():
@@ -86,7 +56,7 @@ def check_map_dir(name: str, data_dir: str) -> bool:
     return True
 
 
-def load_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
+def read_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
     with path.open('r') as f:
         try:
             data = yaml.safe_load(f)
@@ -108,6 +78,36 @@ def load_yaml(path: pathlib.Path) -> Optional[MapMetaData]:
             rospy.logerr(f"The YAML file at {path} is missing the {e} key.")
 
 
+def read_pgm(file: pathlib.Path) -> Optional[Tuple[np.ndarray, int]]:
+    if not file.is_file():
+        return None
+
+    with file.open('rb') as f:
+        # https://users.wpi.edu/~cfurlong/me-593n/pgmimage.html
+        try:
+            p5, comment, dims, max_val = f.readline(), f.readline(), f.readline(), f.readline()
+            if p5 != b"P5\n":
+                rospy.logerr("Invlid PGM File")
+                return None
+            rows, cols = map(int, dims.decode('ASCII').strip().split(' '))
+            maximum_value = int(max_val.decode('ASCII').strip())
+            if maximum_value > 255:
+                rospy.logerr(f"No support for reading pgm files with max value greater than {maximum_value}")
+                return None
+
+            map_data = f.read()
+            if len(map_data) != rows * cols:
+                rospy.logerr(f"Invalid PGM file read {len(map_data)}, expected {rows * cols}.")
+                return None
+
+            arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
+            return arr, maximum_value
+
+        except None:
+            print("Error")
+            return None
+
+
 class MapPublisher:
     def __init__(self, topic: str, name: str, data_dir: str):
         self.is_init = False
@@ -122,7 +122,7 @@ class MapPublisher:
         if not check_map_dir(name, data_dir):
             return False
 
-        self.meta_data = load_yaml(pathlib.Path(data_dir) / name / 'map.yaml')
+        self.meta_data = read_yaml(pathlib.Path(data_dir) / name / 'map.yaml')
         if self.meta_data is None:
             rospy.logerr("Could not load the yaml file.")
             return False

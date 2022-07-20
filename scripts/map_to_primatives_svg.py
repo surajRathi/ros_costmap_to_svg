@@ -73,16 +73,23 @@ class CommonData:
 
         with io.StringIO() as f:
             f.write(
-                f"<svg xmlns='http://www.w3.org/2000/svg' width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewBox='0 0 {self.img.shape[0]} {self.img.shape[1]}' "
-                "fill='#044B94' fill-opacity='0.4'>\n")
+                f"<svg xmlns='http://www.w3.org/2000/svg' width='{self.img.shape[0]}' height='{self.img.shape[1]}' viewBox='0 0 {self.img.shape[0]} {self.img.shape[1]}'>\n")
             f.write("<style><![CDATA[\n"
-                    ".item { stroke: #F00; fill: #F00; }"
-                    "line.item {stroke-width: 4; stroke-linecap: 'round;}\n"  # TODO: Take stroke-width from scale
+                    ".bg {fill: #044B94; fill-opacity: 0.2;}\n"
+
+                    ".obstacle { stroke: #F00; fill: #F00; }\n"
+                    "line.obstacle {stroke-width: 4; stroke-linecap: round;}\n"  # TODO: Take stroke-width from scale
+                    
+                    ".preferred {fill: #5bbb9f; fill-opacity: 0.4; stroke: #5bbb9f; stroke-opacity: 0.4;}\n"
+                    ".blinknbeep {fill: #e0cb52; fill-opacity: 0.4; stroke: #e0cb52; stroke-opacity: 0.4;}\n"
+
+                    ".selector {stroke: green; fill: #5cceee; fill-opacity: 0.25; stroke-width: 1;} \n"
+                    ""
                     "]]></style>\n")
             f.write(f"<rect x='0' y='0' class='bg' width='{self.img.shape[0]}' height='{self.img.shape[1]}' />\n")
 
             for (l,) in lines:
-                f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' class='item' />\n")
+                f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' class='item obstacle' />\n")
 
             f.write("</svg>")
 

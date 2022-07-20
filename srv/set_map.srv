@@ -1,0 +1,3 @@
+string map  # Send an empty string as a query
+---
+string set_map

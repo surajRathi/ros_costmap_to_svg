@@ -1,5 +1,4 @@
-string name
---
+---
 int8 success  # 1 is success 0 is failure
 string svg_data
 string raw_png

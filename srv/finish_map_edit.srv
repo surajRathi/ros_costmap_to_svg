@@ -1,0 +1,4 @@
+string name
+string svg_data  # Empty string cancels the edit
+--
+int8 success  # 1 is success 0 is failure

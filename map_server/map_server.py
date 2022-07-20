@@ -11,7 +11,10 @@ from PIL import Image
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from rospy.numpy_msg import numpy_msg
+from nav_msgs.srv import GetMap, GetMapRequest, GetMapResponse
 from map_to_svg.srv import SetMap, SetMapRequest, SetMapResponse
+from map_to_svg.srv import StartEditing, StartEditingRequest, StartEditingResponse
+from map_to_svg.srv import FinishEditing, FinishEditingRequest, FinishEditingResponse
 
 """
 Contents of a map directory:
@@ -161,9 +164,18 @@ class MapPublisher:
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
 
-        self.set_map_srv = rospy.Service('set_map_srv', SetMap, self.set_map)
+        self.set_map_srv = rospy.Service('static_map', GetMap, self.get_map)
+        self.set_map_srv = rospy.Service('map_server/set_map', SetMap, self.set_map)
+        self.start_editing_srv = rospy.Service('map_server/start_editing', StartEditing, self.start_editing)
+        self.finish_editing_srv = rospy.Service('map_server/finish_editing', FinishEditing, self.finish_editing)
+
         if self.name is not None:
             self.loaded = self.load()
+
+    def get_map(self, req: GetMapRequest) -> GetMapResponse:
+        resp = GetMapResponse()
+        resp.map = self.map_data
+        return resp
 
     def set_map(self, req: SetMapRequest) -> SetMapResponse:
         resp = SetMapResponse()
@@ -178,6 +190,12 @@ class MapPublisher:
             resp.set_map = '' if self.name is None else self.name
 
         return resp
+
+    def start_editing(self, req: StartEditingRequest) -> StartEditingResponse:
+        return StartEditingResponse()
+
+    def finish_editing(self, req: FinishEditingRequest) -> FinishEditingResponse:
+        return FinishEditingResponse()
 
     def load(self) -> bool:  # Success
         if self.name is None:

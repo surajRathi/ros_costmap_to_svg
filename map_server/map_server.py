@@ -6,7 +6,8 @@ import numpy as np
 import rospy
 import yaml
 from geometry_msgs.msg import Pose
-from nav_msgs.msg import MapMetaData
+from nav_msgs.msg import MapMetaData, OccupancyGrid
+from rospy.numpy_msg import numpy_msg
 
 """
 Contents of a map directory:
@@ -112,7 +113,7 @@ def read_yaml(path: pathlib.Path) -> Optional[Tuple[MapMetaData, Callable[[np.nd
             rospy.logerr(f"The YAML file at {path} is missing the {e} key.")
 
 
-def read_pgm(file: pathlib.Path) -> Optional[Tuple[np.ndarray, int]]:
+def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
     if not file.is_file():
         return None
 
@@ -135,7 +136,7 @@ def read_pgm(file: pathlib.Path) -> Optional[Tuple[np.ndarray, int]]:
                 return None
 
             arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
-            return arr, maximum_value
+            return arr
 
         except None:
             print("Error")
@@ -143,11 +144,14 @@ def read_pgm(file: pathlib.Path) -> Optional[Tuple[np.ndarray, int]]:
 
 
 class MapPublisher:
-    def __init__(self, topic: str, name: str, data_dir: str):
+    def __init__(self, topic: str, frame_id: str, name: str, data_dir: str):
         self.is_init = False
         self.data: Optional[np.ndarray] = None
-        self.max_val: Optional[int] = None
         self.meta_data: Optional[MapMetaData] = None
+        self.map_data: Optional[numpy_msg(OccupancyGrid)] = None
+
+        self.topic = topic
+        self.frame_id = frame_id
 
         if self.init(name, data_dir):
             self.is_init = True
@@ -161,16 +165,21 @@ class MapPublisher:
             rospy.logerr("Could not load the yaml file.")
             return False
 
-        read_pgm_ret = read_pgm(pathlib.Path(data_dir) / name / 'map.pgm')
-        if read_pgm_ret is None:
+        map_arr = read_pgm(pathlib.Path(data_dir) / name / 'map.pgm')
+        if map_arr is None:
             rospy.logerr("Could not load the pgm file.")
             return False
 
-        self.data, self.max_val = read_pgm_ret
-        self.data = value_interpreter(self.data)
-        self.meta_data.width, self.meta_data.height = self.data.shape
+        self.meta_data.width, self.meta_data.height = map_arr.shape
 
-        print(self.meta_data, np.unique(self.data), sep='\n')
+        self.map_data: numpy_msg(OccupancyGrid) = numpy_msg(OccupancyGrid)()
+        # self.map_data: OccupancyGrid = numpy_msg(OccupancyGrid)()  # Uncomment for autocomplete
+        self.map_data.header.frame_id = self.frame_id
+        self.map_data.header.stamp = self.meta_data.map_load_time
+        self.map_data.info = self.meta_data
+        self.map_data.data = value_interpreter(map_arr.reshape(-1)).astype(np.uint8)
+
+        # print(self.map_data, np.unique(self.map_data.data), sep='\n')
         return True
 
     def update_map(self):
@@ -182,8 +191,9 @@ def main():
 
     topic: str = '/map'
     data_dir: str = '/home/suraj/ws/src/rosjs/map_to_svg/data/final'
+    frame_id: str = 'map'
 
-    m = MapPublisher(topic, 'tb3', data_dir)
+    m = MapPublisher(topic, frame_id, 'tb3', data_dir)
     # rospy.spin()
 
 

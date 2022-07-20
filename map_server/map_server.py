@@ -151,15 +151,40 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
 
 
 class MapPublisher:
+
+    @property
+    def name(self) -> Optional[str]:
+        return self._name
+
+    @name.setter
+    def name(self, new_name: Optional[str]):
+        self.loaded = False
+        if new_name is not None:
+            self.loaded = self.load(new_name)
+
+        self._name = new_name
+
+        if not self.loaded:
+            # self.meta_data = MapMetaData()
+            # self.map_data = numpy_msg(OccupancyGrid)()
+            # self.map_data.info = self.meta_data
+            # self.map_data.data = np.zeros((0,))
+            #
+            # self.meta_pub.publish(self.meta_data)
+            # self.map_pub.publish(self.map_data)
+            rospy.logerr('Invalid map name')
+            self._name = None
+
     def __init__(self, frame_id: str, data_dir: str, name: Optional[str] = None):
         self.loaded = False
         self.data: Optional[np.ndarray] = None
         self.meta_data: Optional[MapMetaData] = None
         self.map_data: Optional[numpy_msg(OccupancyGrid)] = None
 
+        self._name = None
+
         self.frame_id = frame_id
         self.data_dir = data_dir
-        self.name = name
 
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
@@ -169,8 +194,7 @@ class MapPublisher:
         self.start_editing_srv = rospy.Service('map_server/start_editing', StartEditing, self.start_editing)
         self.finish_editing_srv = rospy.Service('map_server/finish_editing', FinishEditing, self.finish_editing)
 
-        if self.name is not None:
-            self.loaded = self.load()
+        self.name = name
 
     def get_map(self, req: GetMapRequest) -> GetMapResponse:
         resp = GetMapResponse()
@@ -178,16 +202,11 @@ class MapPublisher:
         return resp
 
     def set_map(self, req: SetMapRequest) -> SetMapResponse:
-        resp = SetMapResponse()
-
-        if req.map == '':
-            resp.set_map = '' if self.name is None else self.name
-        else:
+        if req.map != '':
             self.name = req.map
-            self.loaded = self.load()
-            if not self.loaded:
-                self.name = None
-            resp.set_map = '' if self.name is None else self.name
+
+        resp = SetMapResponse()
+        resp.set_map = '' if self.name is None else self.name
 
         return resp
 
@@ -197,18 +216,18 @@ class MapPublisher:
     def finish_editing(self, req: FinishEditingRequest) -> FinishEditingResponse:
         return FinishEditingResponse()
 
-    def load(self) -> bool:  # Success
-        if self.name is None:
+    def load(self, name) -> bool:  # Success
+        if name is None:
             return False
-        if not check_map_dir(self.name, self.data_dir):
+        if not check_map_dir(name, self.data_dir):
             return False
 
-        self.meta_data, value_interpreter = read_yaml(pathlib.Path(self.data_dir) / self.name / 'map.yaml')
+        self.meta_data, value_interpreter = read_yaml(pathlib.Path(self.data_dir) / name / 'map.yaml')
         if self.meta_data is None:
             rospy.logerr("Could not load the yaml file.")
             return False
 
-        map_arr = read_pgm(pathlib.Path(self.data_dir) / self.name / 'map.pgm')
+        map_arr = read_pgm(pathlib.Path(self.data_dir) / name / 'map.pgm')
         if map_arr is None:
             rospy.logerr("Could not load the pgm file.")
             return False

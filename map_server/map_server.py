@@ -1,4 +1,5 @@
 #! /usr/bin/python3
+import base64
 import io
 import pathlib
 from typing import Optional, Tuple, Callable
@@ -6,6 +7,7 @@ from typing import Optional, Tuple, Callable
 import numpy as np
 import rospy
 import yaml
+from PIL import Image
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from rospy.numpy_msg import numpy_msg
@@ -189,18 +191,19 @@ class MapPublisher:
         rospy.loginfo('Publishing to the topic map and map_metadata.')
         return True
 
-    def as_base64(self) -> str:
+    def as_svg_editor_bg(self) -> str:
         if not self.loaded:
             return ''
 
-        import base64
-        from PIL import Image
+        # Returns a base64 encoded png of the map
+        # The PNG is flipped in the x (rows) axis.
+
         image = np.zeros((self.meta_data.width, self.meta_data.height, 3), dtype=np.uint8)
         image[...] = 127
         im_like = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
-        image[im_like == 100] = (14, 14, 14)
-        image[im_like == 0] = (193, 193, 193)
-        image[im_like == -1] = (93, 100, 108)
+        image[im_like[::-1, :] == 100] = (14, 14, 14)
+        image[im_like[::-1, :] == 0] = (193, 193, 193)
+        image[im_like[::-1, :] == -1] = (93, 100, 108)
 
         with io.BytesIO() as f:
             Image.fromarray(image).save(f, 'PNG')
@@ -215,6 +218,7 @@ def main():
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
     m = MapPublisher(frame_id, 'tb3', data_dir)
+    print(m.as_svg_editor_bg())
     rospy.spin()
 
 

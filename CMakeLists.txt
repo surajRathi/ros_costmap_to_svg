@@ -30,9 +30,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  set_map.srv
-  start_editing.srv
-  finish_editing.srv
+  SetMap.srv
+  StartEditing.srv
+  FinishEditing.srv
 )
 
 ## Generate actions in the 'action' folder

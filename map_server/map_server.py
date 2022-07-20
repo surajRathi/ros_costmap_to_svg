@@ -1,4 +1,5 @@
 #! /usr/bin/python3
+import io
 import pathlib
 from typing import Optional, Tuple, Callable
 
@@ -187,6 +188,24 @@ class MapPublisher:
         self.map_pub.publish(self.map_data)
         rospy.loginfo('Publishing to the topic map and map_metadata.')
         return True
+
+    def as_base64(self) -> str:
+        if not self.loaded:
+            return ''
+
+        import base64
+        from PIL import Image
+        image = np.zeros((self.meta_data.width, self.meta_data.height, 3), dtype=np.uint8)
+        image[...] = 127
+        im_like = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
+        image[im_like == 100] = (14, 14, 14)
+        image[im_like == 0] = (193, 193, 193)
+        image[im_like == -1] = (93, 100, 108)
+
+        with io.BytesIO() as f:
+            Image.fromarray(image).save(f, 'PNG')
+            f.seek(0)
+            return base64.b64encode(f.read()).decode('ASCII')
 
 
 def main():

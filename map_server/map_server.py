@@ -191,7 +191,7 @@ class MapPublisher:
         rospy.loginfo('Publishing to the topic map and map_metadata.')
         return True
 
-    def as_svg_editor_bg(self) -> str:
+    def as_base64_svg_editor_bg(self) -> str:
         if not self.loaded:
             return ''
 
@@ -218,7 +218,6 @@ def main():
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
     m = MapPublisher(frame_id, 'tb3', data_dir)
-    print(m.as_svg_editor_bg())
     rospy.spin()
 
 

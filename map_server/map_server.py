@@ -23,9 +23,9 @@ from lxml import etree
 """
 Contents of a map directory:
 - map.yaml [REQUIRED]
-- map.pgm
-- map.png
+- map.pgm [REQUIRED]
 - map.svg
+- obs.pgm (generated from map.svg via the frontend)
 - map.lock [MAYBE]
 
 Either one of `map.pgm` and `map.svg` must exist.

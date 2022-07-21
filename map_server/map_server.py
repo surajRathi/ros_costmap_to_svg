@@ -317,7 +317,7 @@ class MapPublisher:
 
         with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
             f.write(
-                f"<svg xmlns='http://www.w3.org/2000/svg' width='{img.shape[0]}' height='{img.shape[1]}' viewBox='0 0 {img.shape[0]} {img.shape[1]}'>\n")
+                f"<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 {img.shape[0]} {img.shape[1]}'>\n")
 
             f.write(f"<rect x='0' y='0' class='bg' width='{img.shape[0]}' height='{img.shape[1]}' />\n")
 

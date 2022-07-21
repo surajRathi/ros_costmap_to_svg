@@ -2,7 +2,6 @@
 import base64
 import io
 import pathlib
-import time
 from typing import Optional, Tuple, Callable
 
 import cv2
@@ -11,13 +10,13 @@ import rospy
 import yaml
 from PIL import Image
 from geometry_msgs.msg import Pose
-from nav_msgs.msg import MapMetaData, OccupancyGrid
-from rospy.numpy_msg import numpy_msg
-from nav_msgs.srv import GetMap, GetMapRequest, GetMapResponse
-from map_to_svg.srv import SetMap, SetMapRequest, SetMapResponse
-from map_to_svg.srv import StartEditing, StartEditingRequest, StartEditingResponse
 from map_to_svg.srv import FinishEditing, FinishEditingRequest, FinishEditingResponse
 from map_to_svg.srv import ListMaps, ListMapsRequest, ListMapsResponse
+from map_to_svg.srv import SetMap, SetMapRequest, SetMapResponse
+from map_to_svg.srv import StartEditing, StartEditingRequest, StartEditingResponse
+from nav_msgs.msg import MapMetaData, OccupancyGrid
+from nav_msgs.srv import GetMap, GetMapRequest, GetMapResponse
+from rospy.numpy_msg import numpy_msg
 
 """
 Contents of a map directory:
@@ -179,6 +178,7 @@ class MapPublisher:
             self._name = None
 
     def __init__(self, frame_id: str, data_dir: str, name: Optional[str] = None):
+        self.temp = None
         self.loaded = False
         self.data: Optional[np.ndarray] = None
         self.meta_data: Optional[MapMetaData] = None
@@ -296,7 +296,7 @@ class MapPublisher:
         if not self.loaded:
             return ''
         scale = max(1, self.map_data.info.resolution / 0.01)
-        img = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
+        img = self.map_data.data.reshape(self.meta_data.height, self.meta_data.width)
 
         edges = cv2.dilate((img == 0).astype('uint8') * 255, cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)), 1) \
                 & ((img == 100).astype('uint8') * 255)
@@ -318,9 +318,9 @@ class MapPublisher:
 
         with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
             f.write(
-                f"<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 {img.shape[0]} {img.shape[1]}'>\n")
+                f"<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 {img.shape[1]} {img.shape[0]}'>\n")
 
-            f.write(f"<rect x='0' y='0' class='bg' width='{img.shape[0]}' height='{img.shape[1]}' />\n")
+            f.write(f"<rect x='0' y='0' class='bg' width='{img.shape[1]}' height='{img.shape[0]}' />\n")
 
             for (l,) in lines:
                 f.write(f"<line x1='{l[0]}' y1='{l[1]}' x2='{l[2]}' y2='{l[3]}' class='item obstacle' />\n")

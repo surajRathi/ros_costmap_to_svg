@@ -16,6 +16,7 @@ from nav_msgs.srv import GetMap, GetMapRequest, GetMapResponse
 from map_to_svg.srv import SetMap, SetMapRequest, SetMapResponse
 from map_to_svg.srv import StartEditing, StartEditingRequest, StartEditingResponse
 from map_to_svg.srv import FinishEditing, FinishEditingRequest, FinishEditingResponse
+from map_to_svg.srv import ListMaps, ListMapsRequest, ListMapsResponse
 
 """
 Contents of a map directory:
@@ -190,7 +191,8 @@ class MapPublisher:
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
 
-        self.set_map_srv = rospy.Service('static_map', GetMap, self.get_map)
+        self.static_map_srv = rospy.Service('static_map', GetMap, self.get_map)  # TODO: Check
+        self.list_maps_srv = rospy.Service('map_server/list_maps', ListMaps, self.list_maps)
         self.set_map_srv = rospy.Service('map_server/set_map', SetMap, self.set_map)
         self.start_editing_srv = rospy.Service('map_server/start_editing', StartEditing, self.start_editing)
         self.finish_editing_srv = rospy.Service('map_server/finish_editing', FinishEditing, self.finish_editing)
@@ -200,6 +202,15 @@ class MapPublisher:
     def get_map(self, req: GetMapRequest) -> GetMapResponse:
         resp = GetMapResponse()
         resp.map = self.map_data
+        return resp
+
+    def list_maps(self, req: ListMapsRequest) -> ListMapsResponse:
+        resp = ListMapsResponse()
+        resp.maps = []
+        for file in pathlib.Path(self.data_dir).iterdir():
+            if file.is_dir() and check_map_dir(file.name, self.data_dir):
+                resp.maps.append(file.name)
+
         return resp
 
     def set_map(self, req: SetMapRequest) -> SetMapResponse:

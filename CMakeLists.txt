@@ -31,6 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_service_files(
   FILES
   SetMap.srv
+  ListMaps.srv
   StartEditing.srv
   FinishEditing.srv
 )

@@ -282,9 +282,9 @@ class MapPublisher:
 
         # Returns a base64 encoded png of the map
 
-        image = np.zeros((self.meta_data.width, self.meta_data.height, 3), dtype=np.uint8)
+        image = np.zeros((self.meta_data.height, self.meta_data.width, 3), dtype=np.uint8)
         image[...] = (93, 100, 108)  # for im_like == -1
-        im_like = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
+        im_like = self.map_data.data.reshape(self.meta_data.height, self.meta_data.width)
         image[im_like == 100] = (14, 14, 14)
         image[im_like == 0] = (193, 193, 193)
 

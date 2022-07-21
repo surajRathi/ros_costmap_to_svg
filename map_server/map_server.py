@@ -186,6 +186,8 @@ class MapPublisher:
         self.data: Optional[np.ndarray] = None
         self.meta_data: Optional[MapMetaData] = None
         self.map_data: Optional[numpy_msg(OccupancyGrid)] = None
+        self.obs_map_data: Optional[numpy_msg(OccupancyGrid)] = None
+        self.svg_map_data: Optional[String] = None
 
         self._name = None
 
@@ -250,15 +252,25 @@ class MapPublisher:
         with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
             f.write(req.svg_data)
 
+        # TODO: Render the obstacle svg directly onto an occupancy grid
+        # Save the obstacle png as a pgm
         # The below line is correct.
         # noinspection PyTypeChecker
         im = np.array(Image.open(io.BytesIO(base64.b64decode(req.png_data[req.png_data.find(','):]))))
-        print(im.shape)
-        # Save the obstacle png as a pgm
-        # TODO: Render the obstacle svg directly onto an occupancy grid
-        # Reload
+        im1 = np.zeros(im.shape[:2], dtype=np.uint8) + 100
+        im1[np.any(im[:, :, :3] != 0, axis=-1)] = 0
 
-        return FinishEditingResponse(success=1)
+        with (pathlib.Path(self.data_dir) / self.name / 'obs.pgm').open('wb') as f:
+            f.write(b'P5\n')
+            f.write(f"# CREATOR: map_server.py {self.meta_data.resolution:.3f} m/pix\n".encode())
+            f.write(f"{self.meta_data.width} {self.meta_data.height}\n".encode())
+            f.write(b"255\n")
+            f.write(im1.tobytes())
+
+        # Reload
+        self.load(self.name)
+
+        return FinishEditingResponse(success=(1 if self.loaded else 0))
 
     def load(self, name) -> bool:  # Success
         if name is None:
@@ -291,7 +303,45 @@ class MapPublisher:
         self.map_pub.publish(self.map_data)
         rospy.loginfo('Publishing to the topic map and map_metadata.')
 
-        self.create_svg()
+        obs_pgm_path = pathlib.Path(self.data_dir) / name / 'obs.pgm'
+        if obs_pgm_path.exists():
+            map_arr = read_pgm(obs_pgm_path)
+            if map_arr is None:
+                rospy.logerr("Could not load the obs pgm file.")
+                return False
+
+            width, height = map_arr.shape
+            if width != self.meta_data.width or height != self.meta_data.height:
+                rospy.logerr('obs pgm is the wrong shape')
+            else:
+                self.obs_map_data: numpy_msg(OccupancyGrid) = numpy_msg(OccupancyGrid)()
+                self.obs_map_data.header.frame_id = self.frame_id
+                self.obs_map_data.header.stamp = self.meta_data.map_load_time
+                self.obs_map_data.info = self.meta_data
+                self.obs_map_data.data = value_interpreter(map_arr.reshape(-1)).astype(np.uint8)
+
+                self.obs_map_pub.publish(self.obs_map_data)
+                rospy.loginfo('Publishing to the topic obs_map.')
+
+        svg_file = pathlib.Path(self.data_dir) / name / 'map.svg'
+        if not svg_file.exists():
+            self.create_svg(name)
+        self.svg_map_data = String()
+
+        # TODO: Horrible, horrible hack
+        svg_data = svg_file.open('r').read()
+        svg_data_in = svg_data.find('>') + 1
+        svg_data_in1 = svg_data.find('<svg ') + len('<svg ')
+        css_data = (pathlib.Path(self.data_dir) / 'map.css').open('r').read()
+
+        self.svg_map_data.data = svg_data[:svg_data_in1] + f"width='{self.meta_data.width}' " \
+                                 + svg_data[svg_data_in1:svg_data_in] \
+                                 + f"<style>" + css_data + '</style>' \
+                                 + svg_data[svg_data_in:]
+
+        self.svg_map_pub.publish(self.svg_map_data)
+        rospy.loginfo('Publishing to the topic svg_map.')
+
         return True
 
     def as_base64_svg_editor_bg(self) -> str:
@@ -311,9 +361,12 @@ class MapPublisher:
             f.seek(0)
             return base64.b64encode(f.read()).decode('ASCII')
 
-    def create_svg(self):
-        if not self.loaded:
+    def create_svg(self, name=None):
+        if name is None and not self.loaded:
             return ''
+
+        if name is None:
+            name = self.name
         scale = max(1, self.map_data.info.resolution / 0.01)
         img = self.map_data.data.reshape(self.meta_data.height, self.meta_data.width)
 
@@ -335,7 +388,7 @@ class MapPublisher:
         # print(img.max(), img.min(), (img == 0).sum(), (img == 100).sum(), (img == 255).sum())
         obs = ((img == 100).astype('uint8') * 255) & ~line_mask
 
-        with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
+        with (pathlib.Path(self.data_dir) / name / 'map.svg').open('w') as f:
             f.write(
                 f"<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 {img.shape[1]} {img.shape[0]}'>\n")
 

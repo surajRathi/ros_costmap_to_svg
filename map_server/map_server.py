@@ -17,6 +17,8 @@ from map_to_svg.srv import StartEditing, StartEditingRequest, StartEditingRespon
 from nav_msgs.msg import MapMetaData, OccupancyGrid
 from nav_msgs.srv import GetMap, GetMapRequest, GetMapResponse
 from rospy.numpy_msg import numpy_msg
+from std_msgs.msg import String
+from lxml import etree
 
 """
 Contents of a map directory:
@@ -145,6 +147,7 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
                 return None
 
             arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
+            print(arr.shape)
             return arr
 
         except None:
@@ -191,6 +194,8 @@ class MapPublisher:
 
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
+        self.obs_map_pub = rospy.Publisher('obs_map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
+        self.svg_map_pub = rospy.Publisher('svg_map', String, queue_size=1, latch=True)
 
         self.static_map_srv = rospy.Service('static_map', GetMap, self.get_map)  # TODO: Check
         self.list_maps_srv = rospy.Service('map_server/list_maps', ListMaps, self.list_maps)
@@ -238,8 +243,22 @@ class MapPublisher:
         return resp
 
     def finish_editing(self, req: FinishEditingRequest) -> FinishEditingResponse:
-        print(req.svg_data)
-        return FinishEditingResponse()
+        if req.svg_data == '':
+            return FinishEditingResponse(success=1)
+
+        # Save the svg without the
+        with (pathlib.Path(self.data_dir) / self.name / 'map.svg').open('w') as f:
+            f.write(req.svg_data)
+
+        # The below line is correct.
+        # noinspection PyTypeChecker
+        im = np.array(Image.open(io.BytesIO(base64.b64decode(req.png_data[req.png_data.find(','):]))))
+        print(im.shape)
+        # Save the obstacle png as a pgm
+        # TODO: Render the obstacle svg directly onto an occupancy grid
+        # Reload
+
+        return FinishEditingResponse(success=1)
 
     def load(self, name) -> bool:  # Success
         if name is None:

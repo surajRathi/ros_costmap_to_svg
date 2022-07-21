@@ -2,6 +2,7 @@
 import base64
 import io
 import pathlib
+import time
 from typing import Optional, Tuple, Callable
 
 import cv2
@@ -28,6 +29,7 @@ Contents of a map directory:
 
 Either one of `map.pgm` and `map.svg` must exist.
 """
+im = None
 
 
 def check_map_dir(name: str, data_dir: str) -> bool:
@@ -283,8 +285,11 @@ class MapPublisher:
         image = np.zeros((self.meta_data.width, self.meta_data.height, 3), dtype=np.uint8)
         image[...] = (93, 100, 108)  # for im_like == -1
         im_like = self.map_data.data.reshape(self.meta_data.width, self.meta_data.height)
-        image[im_like[:, :] == 100] = (14, 14, 14)
-        image[im_like[:, :] == 0] = (193, 193, 193)
+        image[im_like == 100] = (14, 14, 14)
+        image[im_like == 0] = (193, 193, 193)
+
+        global im
+        im = image.copy()
 
         with io.BytesIO() as f:
             Image.fromarray(image).save(f, 'PNG')
@@ -334,6 +339,13 @@ def main():
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
     m = MapPublisher(frame_id, data_dir, 'tb3_working')
+    import matplotlib.pyplot as plt
+    global im
+    while True:
+        if im is not None:
+            plt.imshow(im)
+            plt.pause(1)
+        time.sleep(1)
     rospy.spin()
 
 

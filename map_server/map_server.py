@@ -211,6 +211,7 @@ class MapPublisher:
             if file.is_dir() and check_map_dir(file.name, self.data_dir):
                 resp.maps.append(file.name)
 
+        resp.current = self.name
         return resp
 
     def set_map(self, req: SetMapRequest) -> SetMapResponse:

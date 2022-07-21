@@ -1,3 +1,4 @@
 string svg_data  # Empty string cancels the edit
+string png_data  # Must be set if svg_data is set
 ---
 int8 success  # 1 is success 0 is failure

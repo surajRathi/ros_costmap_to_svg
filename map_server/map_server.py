@@ -211,7 +211,7 @@ class MapPublisher:
             if file.is_dir() and check_map_dir(file.name, self.data_dir):
                 resp.maps.append(file.name)
 
-        resp.current = self.name
+        resp.current = '' if self.name is None else self.name
         return resp
 
     def set_map(self, req: SetMapRequest) -> SetMapResponse:
@@ -237,6 +237,7 @@ class MapPublisher:
         return resp
 
     def finish_editing(self, req: FinishEditingRequest) -> FinishEditingResponse:
+        print(req.svg_data)
         return FinishEditingResponse()
 
     def load(self, name) -> bool:  # Success
@@ -332,7 +333,7 @@ def main():
     data_dir: str = '/home/suraj/ws/src/rosjs/map_to_svg/data/final'
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
-    m = MapPublisher(frame_id, data_dir, 'tb3')
+    m = MapPublisher(frame_id, data_dir, 'tb3_working')
     rospy.spin()
 
 

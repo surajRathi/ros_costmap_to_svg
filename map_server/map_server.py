@@ -209,7 +209,9 @@ class MapPublisher:
 
     def get_map(self, req: GetMapRequest) -> GetMapResponse:
         resp = GetMapResponse()
-        resp.map = self.map_data
+        resp.map.header = self.map_data.header
+        resp.map.info = self.map_data.info
+        resp.map.data = self.map_data.data.astype(np.int8).tolist()
         return resp
 
     def list_maps(self, req: ListMapsRequest) -> ListMapsResponse:

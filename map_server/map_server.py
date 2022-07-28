@@ -257,7 +257,10 @@ class MapPublisher:
         # The below line is correct.
         # noinspection PyTypeChecker
         im = np.array(Image.open(io.BytesIO(base64.b64decode(req.png_data[req.png_data.find(','):]))))
-        im1 = np.zeros(im.shape[:2], dtype=np.uint8) + 100
+        # 0: Obstacle
+        # 254: free space
+        # 204: unknowns
+        im1 = np.zeros(im.shape[:2], dtype=np.uint8) + 204
         im1[np.any(im[:, :, :3] != 0, axis=-1)] = 0
 
         with (pathlib.Path(self.data_dir) / self.name / 'obs.pgm').open('wb') as f:

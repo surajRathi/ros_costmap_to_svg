@@ -147,7 +147,6 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
                 return None
 
             arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
-            print(arr.shape)
             return arr
 
         except None:
@@ -411,7 +410,7 @@ def main():
     data_dir: str = '/home/suraj/ws/src/rosjs/map_to_svg/data/final'
     frame_id: str = rospy.get_param('~frame_id', 'map')
 
-    m = MapPublisher(frame_id, data_dir, 'tb3_working')
+    m = MapPublisher(frame_id, data_dir, 'office2')
 
     rospy.spin()
 

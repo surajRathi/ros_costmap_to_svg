@@ -124,6 +124,7 @@ def read_yaml(path: pathlib.Path) -> Optional[Tuple[MapMetaData, Callable[[np.nd
             rospy.logerr(f"The YAML file at {path} is missing the {e} key.")
 
 
+# TODO: Support PNG maps!
 def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
     if not file.is_file():
         return None
@@ -135,22 +136,22 @@ def read_pgm(file: pathlib.Path) -> Optional[np.ndarray]:
             if p5 != b"P5\n":
                 rospy.logerr("Invlid PGM File")
                 return None
-            rows, cols = map(int, dims.decode('ASCII').strip().split(' '))
+            width, height = map(int, dims.decode('ASCII').strip().split(' '))
             maximum_value = int(max_val.decode('ASCII').strip())
             if maximum_value > 255:
                 rospy.logerr(f"No support for reading pgm files with max value greater than {maximum_value}")
                 return None
 
             map_data = f.read()
-            if len(map_data) != rows * cols:
-                rospy.logerr(f"Invalid PGM file read {len(map_data)}, expected {rows * cols}.")
+            if len(map_data) != width * height:
+                rospy.logerr(f"Invalid PGM file read {len(map_data)}, expected {width * height}.")
                 return None
 
-            arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(rows, cols)
+            arr: np.ndarray = (np.frombuffer(map_data, dtype=np.uint8)).reshape(width, height)
             return arr
 
         except None:
-            print("Error")
+            rospy.logerr("PGM Read Error")
             return None
 
 
@@ -163,21 +164,22 @@ class MapPublisher:
     @name.setter
     def name(self, new_name: Optional[str]):
         self.loaded = False
+        self._name = None
         if new_name is not None:
-            self.loaded = self.load(new_name)
-
-        self._name = new_name
+            if self.load(new_name):
+                self.loaded = True
+                self._name = new_name
+                rospy.loginfo(f'Loaded {new_name}.')
+            else:
+                rospy.logerr(f'Could not load map {new_name}.')
 
         if not self.loaded:
-            # self.meta_data = MapMetaData()
-            # self.map_data = numpy_msg(OccupancyGrid)()
-            # self.map_data.info = self.meta_data
-            # self.map_data.data = np.zeros((0,))
-            #
-            # self.meta_pub.publish(self.meta_data)
-            # self.map_pub.publish(self.map_data)
-            rospy.logerr('Invalid map name')
-            self._name = None
+            # Doesn't really need to be done, but good for bug checking.
+            self.data = None
+            self.meta_data = None
+            self.map_data = None
+            self.obs_map_data = None
+            self.svg_map_data = None
 
     def __init__(self, frame_id: str, data_dir: str, name: Optional[str] = None):
         self.temp = None
@@ -188,25 +190,31 @@ class MapPublisher:
         self.obs_map_data: Optional[numpy_msg(OccupancyGrid)] = None
         self.svg_map_data: Optional[String] = None
 
-        self._name = None
+        self._name: Optional[str] = None
 
         self.frame_id = frame_id
         self.data_dir = data_dir
 
+        # ROS Handles
         self.meta_pub = rospy.Publisher('map_metadata', data_class=MapMetaData, queue_size=1, latch=True)
         self.map_pub = rospy.Publisher('map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
         self.obs_map_pub = rospy.Publisher('obs_map', data_class=numpy_msg(OccupancyGrid), queue_size=1, latch=True)
         self.svg_map_pub = rospy.Publisher('svg_map', String, queue_size=1, latch=True)
 
-        self.static_map_srv = rospy.Service('static_map', GetMap, self.get_map)  # TODO: Check
+        self.static_map_srv = rospy.Service('static_map', GetMap, self.get_map)
         self.list_maps_srv = rospy.Service('map_server/list_maps', ListMaps, self.list_maps)
         self.set_map_srv = rospy.Service('map_server/set_map', SetMap, self.set_map)
         self.start_editing_srv = rospy.Service('map_server/start_editing', StartEditing, self.start_editing)
         self.finish_editing_srv = rospy.Service('map_server/finish_editing', FinishEditing, self.finish_editing)
 
+        # Initialize self
         self.name = name
 
-    def get_map(self, req: GetMapRequest) -> GetMapResponse:
+    def get_map(self, req: GetMapRequest) -> Optional[GetMapResponse]:
+        # TODO: Properly deal with failure in other services
+        if not self.loaded:
+            return None
+
         resp = GetMapResponse()
         resp.map.header = self.map_data.header
         resp.map.info = self.map_data.info
